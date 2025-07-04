@@ -1,0 +1,14 @@
+{
+	"extends": "@sindresorhus/tsconfig",
+	"compilerOptions": {
+		"outDir": "dist",
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"strict": false
+	},
+	"include": ["src"]
+}
