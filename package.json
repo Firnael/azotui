@@ -1,7 +1,7 @@
 {
 	"name": "azotui",
 	"version": "0.0.1",
-	"license": "MIT",
+	"license": "WTFPL",
 	"bin": {
 		"azotui": "dist/src/cli.js"
 	},
