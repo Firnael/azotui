@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Box, Text} from 'ink';
+import {logDebug} from '../libs/debug.js';
 import {loadImagePixels, getAnsiBlock, type Pixel} from '../libs/media.js';
 
 interface ImagePreviewProps {
@@ -19,7 +20,7 @@ export const ImagePreview = ({filePath, width = 32}: ImagePreviewProps) => {
 		loadImagePixels(filePath, width)
 			.then(setPixels)
 			.catch(err => {
-				console.error('Error loading image preview:', err);
+				logDebug({event: 'image-preview-error', err, file: filePath});
 			});
 	}, [filePath]);
 

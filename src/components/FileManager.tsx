@@ -6,6 +6,7 @@ import {exec} from 'child_process';
 import Gradient from 'ink-gradient';
 import BigText from 'ink-big-text';
 import {Spawn} from 'ink-spawn';
+import SpawnWrapper from './SpawnWrapper.js';
 import {
 	getFileIcon,
 	getFileInfo,
@@ -22,6 +23,7 @@ import {
 	buildImageToWebpArgs,
 	buildVideoToMp4Args,
 } from '../libs/media.js';
+import {logDebug} from '../libs/debug.js';
 import {Modal} from './Modal.js';
 import {ImagePreview} from './ImagePreview.js';
 
@@ -41,7 +43,7 @@ const FileManager = () => {
 	const [fileInfo, setFileInfo] = useState('');
 	const [convertFile, setConvertFile] = useState<string | null>(null);
 	const [targetFile, setTargetFile] = useState<string | null>(null);
-	const [replaceInfo, setReplaceInfo] = useState<string | null>(null);
+ 	const [replaceInfo, setReplaceInfo] = useState<string | null>(null);
 	const [videoPrompt, setVideoPrompt] = useState<{
 		file: string | null;
 		keepSound: boolean | null;
@@ -204,7 +206,7 @@ const FileManager = () => {
 			else openCmd = `xdg-open "${fileToOpen}"`;
 
 			exec(openCmd, err => {
-				console.log('Cannot open file dawg');
+				logDebug({event: 'open-file-error', err, file: fileToOpen});
 			});
 		}
 	});
@@ -250,7 +252,14 @@ const FileManager = () => {
 		setTimeout(() => setReplaceInfo(''), 4000);
 	}
 
-	const handleImageConversionComplete = async () => {
+	const handleImageConversionComplete = async (err?: any) => {
+		if (err) {
+			logDebug({event: 'image-conversion-failed', err, file: convertFile});
+			setReplaceInfo(`Image conversion failed: ${err?.message ?? String(err)}`);
+			// keep convert modal visible briefly so user can read failureText from Spawn
+			setTimeout(() => setConvertFile(null), 2000);
+			return;
+		}
 		if (convertFile && targetFile) {
 			updateReferencesInTargetFile({
 				filePath: convertFile,
@@ -263,7 +272,13 @@ const FileManager = () => {
 		setConvertFile(null);
 	};
 
-	const handleVideoConversionComplete = () => {
+	const handleVideoConversionComplete = (err?: any) => {
+		if (err) {
+			logDebug({event: 'video-conversion-failed', err, file: videoPrompt.file, keepSound: videoPrompt.keepSound});
+			setReplaceInfo(`Video conversion failed: ${err?.message ?? String(err)}`);
+			setTimeout(() => setVideoPrompt({file: null, keepSound: null, active: false}), 2000);
+			return;
+		}
 		if (videoPrompt.file && targetFile) {
 			updateReferencesInTargetFile({
 				filePath: videoPrompt.file,
@@ -401,13 +416,21 @@ const FileManager = () => {
 			{convertFile && (
 				<Modal width={60} height={10} color={'green'}>
 					<Text>Converting {convertFile} to .webp...</Text>
-					<Spawn
+					{/* Debug: show ffmpeg command and args */}
+					<Text color="gray">{getFfmpegPath()} {buildImageToWebpArgs(
+						path.join(currentDir, convertFile),
+						path.join(currentDir, convertFile.replace(/\.[^.]+$/, '.webp')),
+					).join(' ')}</Text>
+					<SpawnWrapper
 						command={getFfmpegPath()}
 						args={buildImageToWebpArgs(
 							path.join(currentDir, convertFile),
 							path.join(currentDir, convertFile.replace(/\.[^.]+$/, '.webp')),
 						)}
-						shell
+
+						runningText={`Converting ${convertFile}...`}
+						successText={`Converted ${convertFile}`}
+						failureText={`Failed to convert ${convertFile}`}
 						onCompletion={handleImageConversionComplete}
 					/>
 					<Text color="yellow">Press ESC to close</Text>
@@ -426,7 +449,16 @@ const FileManager = () => {
 			{videoPrompt.file && videoPrompt.keepSound !== null && (
 				<Modal width={60} height={10} color={'green'}>
 					<Text>Converting {videoPrompt.file} to .mp4...</Text>
-					<Spawn
+					{/* Debug: show ffmpeg command and args */}
+					<Text color="gray">{getFfmpegPath()} {buildVideoToMp4Args(
+						path.join(currentDir, videoPrompt.file),
+						path.join(
+							currentDir,
+							videoPrompt.file.replace(/\.[^.]+$/, '.mp4'),
+						),
+						videoPrompt.keepSound,
+					).join(' ')}</Text>
+					<SpawnWrapper
 						command={getFfmpegPath()}
 						args={buildVideoToMp4Args(
 							path.join(currentDir, videoPrompt.file),
@@ -436,7 +468,10 @@ const FileManager = () => {
 							),
 							videoPrompt.keepSound,
 						)}
-						shell
+
+						runningText={`Converting ${videoPrompt.file}...`}
+						successText={`Converted ${videoPrompt.file}`}
+						failureText={`Failed to convert ${videoPrompt.file}`}
 						onCompletion={handleVideoConversionComplete}
 					/>
 					<Text color="yellow">Press ESC to close</Text>
